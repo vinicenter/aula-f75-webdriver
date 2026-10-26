@@ -1,7 +1,7 @@
 # aula-75-webdriver
 
 A configurator for the **AULA F75** keyboard that runs in the browser. Nothing to install:
-open the site, click **Connect keyboard** and you're done.
+open the [site](https://aula-f75-webdriver.vinicenter.workers.dev), click **Connect keyboard** and you're done.
 
 Inspired by [F75 Studio](https://github.com/trenbolone1122/aula-f75-linux) (`trenbolone1122/aula-f75-linux`), the native
 Linux app, and ported from it to the web using **WebHID** instead of hidapi. The protocol is
