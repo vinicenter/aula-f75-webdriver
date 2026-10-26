@@ -1,0 +1,119 @@
+// Ported from the tests in aula-f75-linux-concept/src/protocol.rs and src/macros.rs.
+import { describe, expect, it } from 'vitest';
+import { buffer, textEvents } from './macros';
+import * as p from './protocol';
+import { KEYS } from './layout';
+
+describe('protocol', () => {
+  it('checksum is the byte sum', () => {
+    const pk = p.readRequest(p.WIRELESS_ONLINE, 0);
+    expect([...pk.subarray(0, 5)]).toEqual([0x13, 0x07, 0x01, 0x00, 0x00]);
+    expect(pk[19]).toBe(0x1b);
+  });
+
+  it('matrix write is 28 packets', () => {
+    const pk = p.writePackets(p.WIRELESS.ledMatrix, 0, new Uint8Array(p.MATRIX_LEN * 3));
+    expect(pk.length).toBe(28);
+    expect(pk.slice(0, 27).every((x) => x[2] === 28 && x[4] === 14)).toBe(true);
+    expect([pk[27][3], pk[27][4]]).toEqual([27, 6]);
+    expect(pk.every((x) => x[19] === p.checksum(x))).toBe(true);
+  });
+
+  it('wired framing', () => {
+    const d = new Uint8Array(600).fill(7);
+    const pk = p.wiredPackets(p.WIRED.ledMatrix, 2, d.length, d);
+    expect(pk.length).toBe(2);
+    expect([...pk[0].subarray(0, 8)]).toEqual([0x06, 0x06, 0x02, 0x00, 0x02, 0x00, 0x00, 0x02]);
+    expect([...pk[1].subarray(0, 8)]).toEqual([0x06, 0x06, 0x02, 0x00, 0x02, 0x01, 88, 0x00]);
+    const r = p.wiredPackets(p.WIRED.led | p.WIRED.readFlag, 0, 128);
+    expect([...r[0].subarray(0, 8)]).toEqual([0x06, 0x84, 0, 0, 1, 0, 128, 0]);
+  });
+
+  it('matrix planes', () => {
+    const c: p.Colours = Array.from({ length: p.LED_COUNT }, () => [0, 0, 0]);
+    c[0] = [10, 20, 30];
+    c[125] = [1, 2, 3];
+    const b = p.matrixPayload(c);
+    expect([b[0], b[126], b[252]]).toEqual([10, 20, 30]);
+    expect([b[125], b[251], b[377]]).toEqual([1, 2, 3]);
+    expect(b.length).toBe(384);
+    expect(p.matrixColours(b)).toEqual(c);
+  });
+
+  it('effect roundtrip against a real block', () => {
+    // probe output from a real F75 over 2.4G
+    const b = new Uint8Array(128);
+    b[9] = 1;
+    b[10] = 0x15;
+    b[0x3a] = 0x09;
+    b[0x3b] = 0x42;
+    b[126] = 0x5a;
+    b[127] = 0xa5;
+    expect(p.ledBlockValid(b)).toBe(true);
+    expect(p.EFFECTS.findIndex((e) => e.id === p.effectFromBlock(b)!.mode)).toBe(18);
+    p.editLedBlock(b, 1, 5, 4, 2);
+    expect([b[9], b[10], b[0x3a], b[0x3b]]).toEqual([0, 1, 5, 0x42]);
+  });
+
+  it('factory layout matches hardware', () => {
+    const f = p.factoryLayer0();
+    expect(p.keymapEncodingOk(f)).toBe(true);
+    // every key of a real F75 base layer, read over 2.4G
+    const hw: [number, number[]][] = [[0, [0x00, 0x00, 0x00, 0x29]], [12, [0x00, 0x00, 0x00, 0x3a]], [18, [0x00, 0x00, 0x00, 0x3b]], [24, [0x00, 0x00, 0x00, 0x3c]], [30, [0x00, 0x00, 0x00, 0x3d]], [36, [0x00, 0x00, 0x00, 0x3e]], [42, [0x00, 0x00, 0x00, 0x3f]], [48, [0x00, 0x00, 0x00, 0x40]], [54, [0x00, 0x00, 0x00, 0x41]], [60, [0x00, 0x00, 0x00, 0x42]], [66, [0x00, 0x00, 0x00, 0x43]], [72, [0x00, 0x00, 0x00, 0x44]], [78, [0x00, 0x00, 0x00, 0x45]], [88, [0x00, 0x00, 0x00, 0x4d]], [1, [0x00, 0x00, 0x00, 0x35]], [7, [0x00, 0x00, 0x00, 0x1e]], [13, [0x00, 0x00, 0x00, 0x1f]], [19, [0x00, 0x00, 0x00, 0x20]], [25, [0x00, 0x00, 0x00, 0x21]], [31, [0x00, 0x00, 0x00, 0x22]], [37, [0x00, 0x00, 0x00, 0x23]], [43, [0x00, 0x00, 0x00, 0x24]], [49, [0x00, 0x00, 0x00, 0x25]], [55, [0x00, 0x00, 0x00, 0x26]], [61, [0x00, 0x00, 0x00, 0x27]], [67, [0x00, 0x00, 0x00, 0x2d]], [73, [0x00, 0x00, 0x00, 0x2e]], [79, [0x00, 0x00, 0x00, 0x2a]], [85, [0x00, 0x00, 0x00, 0x4c]], [2, [0x00, 0x00, 0x00, 0x2b]], [8, [0x00, 0x00, 0x00, 0x14]], [14, [0x00, 0x00, 0x00, 0x1a]], [20, [0x00, 0x00, 0x00, 0x08]], [26, [0x00, 0x00, 0x00, 0x15]], [32, [0x00, 0x00, 0x00, 0x17]], [38, [0x00, 0x00, 0x00, 0x1c]], [44, [0x00, 0x00, 0x00, 0x18]], [50, [0x00, 0x00, 0x00, 0x0c]], [56, [0x00, 0x00, 0x00, 0x12]], [62, [0x00, 0x00, 0x00, 0x13]], [68, [0x00, 0x00, 0x00, 0x2f]], [74, [0x00, 0x00, 0x00, 0x30]], [80, [0x00, 0x00, 0x00, 0x31]], [86, [0x00, 0x00, 0x00, 0x4b]], [3, [0x00, 0x00, 0x00, 0x39]], [9, [0x00, 0x00, 0x00, 0x04]], [15, [0x00, 0x00, 0x00, 0x16]], [21, [0x00, 0x00, 0x00, 0x07]], [27, [0x00, 0x00, 0x00, 0x09]], [33, [0x00, 0x00, 0x00, 0x0a]], [39, [0x00, 0x00, 0x00, 0x0b]], [45, [0x00, 0x00, 0x00, 0x0d]], [51, [0x00, 0x00, 0x00, 0x0e]], [57, [0x00, 0x00, 0x00, 0x0f]], [63, [0x00, 0x00, 0x00, 0x33]], [69, [0x00, 0x00, 0x00, 0x34]], [81, [0x00, 0x00, 0x00, 0x28]], [4, [0x00, 0x02, 0x00, 0x00]], [10, [0x00, 0x00, 0x00, 0x1d]], [16, [0x00, 0x00, 0x00, 0x1b]], [22, [0x00, 0x00, 0x00, 0x06]], [28, [0x00, 0x00, 0x00, 0x19]], [34, [0x00, 0x00, 0x00, 0x05]], [40, [0x00, 0x00, 0x00, 0x11]], [46, [0x00, 0x00, 0x00, 0x10]], [52, [0x00, 0x00, 0x00, 0x36]], [58, [0x00, 0x00, 0x00, 0x37]], [64, [0x00, 0x00, 0x00, 0x38]], [70, [0x00, 0x20, 0x00, 0x00]], [82, [0x00, 0x00, 0x00, 0x52]], [5, [0x00, 0x01, 0x00, 0x00]], [11, [0x00, 0x08, 0x00, 0x00]], [17, [0x00, 0x04, 0x00, 0x00]], [35, [0x00, 0x00, 0x00, 0x2c]], [59, [0x00, 0x10, 0x00, 0x00]], [53, [0x0d, 0x00, 0x00, 0x00]], [77, [0x00, 0x00, 0x00, 0x50]], [83, [0x00, 0x00, 0x00, 0x51]], [89, [0x00, 0x00, 0x00, 0x4f]], [87, [0x00, 0x00, 0x00, 0x4e]]];
+    expect(hw.length).toBe(80);
+    for (const [led, code] of hw) expect([...p.codeAt(f, led)], `matrix ${led}`).toEqual(code);
+  });
+
+  it('keymap sanity rejects a shifted read', () => {
+    const km = p.factoryLayer0();
+    // a 2.4G read that lost packet 3 (bytes 42..56) and shifted the rest
+    const shifted = new Uint8Array(p.KEYMAP_LEN);
+    shifted.set(km.subarray(0, 42));
+    shifted.set(km.subarray(56), 42);
+    expect(p.keymapEncodingOk(shifted)).toBe(false);
+    expect([...shifted.subarray(44, 48)]).toEqual([0, 0x1a, 0, 0]);
+  });
+
+  it('reply parsing', () => {
+    const r = new Uint8Array(20);
+    r.set([0x13, 0x44, 10, 2, 0x0e]);
+    expect(p.parseReply(r)).toEqual({ cmd: 0x44, total: 10, index: 2, len: 14, crcError: false });
+    r[0] = 0x04;
+    expect(p.parseReply(r)).toBeNull();
+  });
+
+  it('every layout key has a distinct led and a factory code', () => {
+    expect(new Set(KEYS.map((k) => k.led)).size).toBe(KEYS.length);
+    expect(KEYS.filter((k) => k.vk !== 0xfa && !p.defaultCode(k.vk)).map((k) => k.label)).toEqual([]);
+  });
+});
+
+describe('macros', () => {
+  it('key events use type 0, modifiers type 1', () => {
+    const b = buffer([{ name: 'hi', events: textEvents('Hi', 20) }]);
+    // table: addr 4, size = 1 + 4 (name) + 6 events * 4
+    expect([...b.subarray(0, 4)]).toEqual([4, 0, 29, 0]);
+    expect([...b.subarray(4, 9)]).toEqual([4, 104, 0, 105, 0]);
+    expect([...b.subarray(9, 13)]).toEqual([0x10, 0, 4, 0xe1]); // Shift down: modifier type 1
+    expect([...b.subarray(13, 17)]).toEqual([0x00, 0, 20, 0x0b]); // H down: key type 0
+    expect([...b.subarray(17, 21)]).toEqual([0x80, 0, 4, 0x0b]); // H up: bit 7
+    expect([...b.subarray(21, 25)]).toEqual([0x90, 0, 20, 0xe1]); // Shift up
+    expect([...b.subarray(25, 29)]).toEqual([0x00, 0, 20, 0x0c]); // i down
+    expect(b.length).toBe(33);
+  });
+
+  it('two macros addresses', () => {
+    const m = (s: string) => ({ name: 'm', events: textEvents(s, 10) });
+    const b = buffer([m('a'), m('bb')]);
+    const u16 = (i: number) => b[i] | (b[i + 1] << 8);
+    expect([u16(0), u16(4)]).toEqual([8, 8 + u16(2)]);
+    expect(u16(4) + u16(6)).toBe(b.length);
+  });
+
+  it('slash and shifted symbols', () => {
+    const ev = textEvents('/?', 10);
+    expect(ev[0].usage).toBe(0x38);
+    expect(ev[2]).toEqual({ usage: 0xe1, down: true, delayMs: 4 });
+    expect(ev[3].usage).toBe(0x38);
+  });
+});

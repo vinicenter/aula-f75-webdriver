@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Configure the AULA F75 keyboard right from the browser: per-key RGB, effects, key remapping, macros and profiles." />
+    <link rel="icon" type="image/png" href="./icon.png" />
+    <title>aula-75-webdriver</title>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <img src="./icon.png" alt="" width="28" height="28" />
+        <span>aula-75-<b>webdriver</b></span>
+      </div>
+
+      <div class="profiles">
+        <label for="profile" class="muted">Profile</label>
+        <select id="profile"></select>
+        <details class="menu">
+          <summary class="btn" title="Profile actions">⋯</summary>
+          <div class="menu-items">
+            <button data-profile="new">New profile</button>
+            <button data-profile="dup">Duplicate</button>
+            <button data-profile="rename">Rename</button>
+            <button data-profile="delete">Delete</button>
+            <hr />
+            <button data-profile="export">Export (.json)</button>
+            <button data-profile="import">Import (.json)</button>
+            <hr />
+            <button data-profile="apply">Send profile to keyboard again</button>
+          </div>
+        </details>
+        <input id="import-file" type="file" accept="application/json,.json" hidden />
+      </div>
+
+      <div class="conn">
+        <span id="status" class="pill">Disconnected</span>
+        <button id="connect" class="primary">Connect keyboard</button>
+      </div>
+    </header>
+
+    <div id="unsupported" class="banner" hidden>
+      This browser doesn't support <b>WebHID</b>. Open this page in <b>Chrome</b>, <b>Edge</b> or <b>Opera</b> on a computer
+      (Windows, macOS, Linux or ChromeOS).
+    </div>
+
+    <main>
+      <section class="board">
+        <svg id="kb" role="img" aria-label="AULA F75 keyboard"></svg>
+        <div class="meter" id="meter" hidden></div>
+        <p id="hint" class="hint"></p>
+      </section>
+
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="light" aria-selected="true">Lighting</button>
+        <button role="tab" data-tab="live">Live effects</button>
+        <button role="tab" data-tab="keys">Keys</button>
+        <button role="tab" data-tab="macros">Macros</button>
+        <button role="tab" data-tab="power">Power</button>
+        <button role="tab" data-tab="help">Help</button>
+      </nav>
+
+      <!-- ------------------------------------------------ lighting -->
+      <section class="panel" data-panel="light">
+        <div class="col">
+          <h2>Keyboard effect</h2>
+          <div id="effects" class="grid chips"></div>
+        </div>
+        <div class="col narrow" id="adjust">
+          <h2>Settings</h2>
+          <label class="field">
+            <span>Brightness <output id="bright-out"></output></span>
+            <input id="bright" type="range" min="0" max="9" step="1" />
+          </label>
+          <label class="field" id="speed-field">
+            <span>Speed <output id="speed-out"></output></span>
+            <input id="speed" type="range" min="0" max="4" step="1" />
+          </label>
+          <div class="field" id="colour-field">
+            <span>Effect color</span>
+            <div id="colours" class="swatches">
+              <label class="swatch rgb" id="fixed-rgb-field" title="Any RGB color (Fixed On only)">
+                <input id="fixed-rgb" type="color" aria-label="Custom RGB color" />
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="col narrow" id="perkey">
+          <h2>Paint keys</h2>
+          <div class="row">
+            <input id="brush" type="color" title="Brush color" />
+            <div class="seg" id="tool">
+              <button data-tool="paint" aria-pressed="true">Brush</button>
+              <button data-tool="pick">Color picker</button>
+            </div>
+          </div>
+          <div id="brush-swatches" class="swatches"></div>
+          <label class="field">
+            <span>Brightness <output id="pk-bright-out"></output></span>
+            <input id="pk-bright" type="range" min="0" max="9" step="1" />
+          </label>
+          <div class="grid presets">
+            <button data-preset="fill">Fill all</button>
+            <button data-preset="rainbow">Rainbow</button>
+            <button data-preset="gradient">Gradient</button>
+            <button data-preset="clear">Clear all</button>
+          </div>
+          <p class="muted small">Click or drag over the keys. Colors are sent to the keyboard when you release the mouse.</p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ live -->
+      <section class="panel" data-panel="live" hidden>
+        <p class="note wired-only">Live effects and audio sync need the <b>USB-C cable</b> and this tab open.</p>
+        <div class="col">
+          <h2>Studio effects</h2>
+          <div id="studio" class="grid chips"></div>
+          <h2>Audio sync</h2>
+          <div class="row">
+            <div class="seg" id="audio-src">
+              <button data-src="screen" aria-pressed="true">Tab/screen audio</button>
+              <button data-src="mic">Microphone</button>
+            </div>
+          </div>
+          <div id="audio-fx" class="grid chips"></div>
+          <button id="live-stop" class="danger">Stop and restore the profile lighting</button>
+        </div>
+        <div class="col narrow">
+          <h2>Palette</h2>
+          <div id="palettes" class="palettes"></div>
+          <label class="field">
+            <span>Speed <output id="lspeed-out"></output></span>
+            <input id="lspeed" type="range" min="0.2" max="3" step="0.1" value="1" />
+          </label>
+          <label class="field">
+            <span>Brightness <output id="lbright-out"></output></span>
+            <input id="lbright" type="range" min="1" max="9" step="1" value="9" />
+          </label>
+          <label class="field">
+            <span>Audio sensitivity <output id="sens-out"></output></span>
+            <input id="sens" type="range" min="0.3" max="3" step="0.1" value="1" />
+          </label>
+          <p class="muted small">
+            With "Tab/screen audio", pick the tab playing the music (or the entire screen on Windows) and tick
+            <b>Share audio</b>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ keys -->
+      <section class="panel" data-panel="keys" hidden>
+        <div class="col">
+          <h2>Remap</h2>
+          <div class="seg" id="layer">
+            <button data-layer="0" aria-pressed="true">Base layer</button>
+            <button data-layer="1">Fn layer</button>
+          </div>
+          <p id="key-info" class="key-info muted">Click a key in the drawing to choose what it does.</p>
+          <div class="row">
+            <select id="target" disabled></select>
+            <button id="remap" class="primary" disabled>Remap</button>
+            <button id="unmap" disabled>Reset to default</button>
+          </div>
+        </div>
+        <div class="col narrow">
+          <h2>Layout</h2>
+          <p class="muted small">Keys with a colored outline differ from the factory default.</p>
+          <button id="restore" class="danger">Restore this layer's default layout</button>
+          <button id="reload-keys">Read again from the keyboard</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ macros -->
+      <section class="panel" data-panel="macros" hidden>
+        <p class="note wired-only">Macros are saved over the <b>USB-C cable</b>. After that the keyboard types them by itself, on any computer.</p>
+        <div class="col">
+          <h2>Text macros</h2>
+          <div id="macro-list" class="macro-list"></div>
+          <div class="row">
+            <button id="macro-add">Add macro</button>
+            <button id="macro-write" class="primary">Save macros to keyboard</button>
+          </div>
+        </div>
+        <div class="col narrow">
+          <h2>How it works</h2>
+          <p class="muted small">
+            Each macro replaces what a key on the base layer does. The text is typed as on a <b>US</b> keyboard:
+            unaccented letters, numbers and ASCII symbols. Removing a macro resets the key to its default.
+          </p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ power -->
+      <section class="panel" data-panel="power" hidden>
+        <div class="col narrow">
+          <h2>Sleep</h2>
+          <label class="field">
+            <span>Turn the lights off after</span>
+            <select id="sleep"></select>
+          </label>
+          <p class="muted small">According to AULA, sleep only applies in wireless mode.</p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ help -->
+      <section class="panel" data-panel="help" hidden>
+        <div class="col">
+          <h2>Getting started</h2>
+          <ol class="steps">
+            <li>Plug in the F75 with the <b>USB-C cable</b> (recommended) or the <b>2.4G receiver</b>.</li>
+            <li>Click <b>Connect keyboard</b> and pick "AULA F75" / "Compx" in the browser dialog.</li>
+            <li>Done: every change goes straight to the keyboard and stays stored on it, even without this site.</li>
+          </ol>
+          <h2>What works on each connection</h2>
+          <table class="support">
+            <thead><tr><th></th><th>Effects and per-key</th><th>Remap</th><th>Macros</th><th>Live and audio</th></tr></thead>
+            <tbody>
+              <tr><th>USB-C cable</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+              <tr><th>2.4G receiver</th><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+              <tr><th>Bluetooth</th><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col narrow">
+          <h2>Trouble?</h2>
+          <ul class="small tips">
+            <li>Close AULA's official driver if it is open.</li>
+            <li>On 2.4G, press a key to wake the keyboard and try again.</li>
+            <li>
+              <b>Linux:</b> the browser needs access to <code>hidraw</code>. Run once:
+              <pre>sudo tee /etc/udev/rules.d/70-aula-f75.rules &lt;&lt;'EOF'
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="fa09", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="258a", ATTRS{idProduct}=="010c", TAG+="uaccess"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger</pre>
+              then replug the cable or the receiver.
+            </li>
+            <li>Profiles are stored in this browser. Use Export/Import to take them to another computer.</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span id="busy" class="busy" hidden>Sending to keyboard…</span>
+      <span id="toast" class="toast" role="status" aria-live="polite"></span>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
