@@ -1,0 +1,10 @@
+// Cloudflare Workers static assets: serves the Vite build in dist/ as-is, no Worker code.
+// Having this file stops `wrangler deploy` from trying to auto-configure the Vite project.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aula-f75-webdriver",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./dist"
+  }
+}
