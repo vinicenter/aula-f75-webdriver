@@ -57,9 +57,7 @@ npm test          # protocol, macros and WebHID transport against an emulated F7
 npm run build     # static site in dist/
 ```
 
-`dist/` is plain HTML/CSS/JS and can go on any static host. The workflow
-[.github/workflows/deploy.yml](.github/workflows/deploy.yml) publishes to GitHub Pages
-on every push to `main` (enable Pages with the "GitHub Actions" source in the repository settings).
+`dist/` is plain HTML/CSS/JS and can go on any static host.
 
 ## Layout
 
